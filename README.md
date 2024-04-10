@@ -17,3 +17,4 @@ This project is aimed at creating an online real-time inventory management syste
 - Internet connection (Wi-Fi or Ethernet)
 - Various electronic components (wires, resistors, etc.)
 - Firebase Account
+- CD74HC4067 Multiplexer
