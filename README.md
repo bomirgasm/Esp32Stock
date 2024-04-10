@@ -8,7 +8,7 @@ This project is aimed at creating an online real-time inventory management syste
 - Web-based interface accessible from any device with a browser.
 - Alerts for low inventory levels or stock-out situations.
 - User authentication and access control.
-- Historical data logging for analysis and reporting.
+- Historical data logging and management using Firebase for analysis and reporting.
 
 ## Components Used
 
@@ -16,7 +16,4 @@ This project is aimed at creating an online real-time inventory management syste
 - Proximity Sensor (e.g., Ultrasonic sensor, Infrared sensor)
 - Internet connection (Wi-Fi or Ethernet)
 - Various electronic components (wires, resistors, etc.)
-
-## Acknowledgements
-
-- Mention any individuals or organizations you'd like to thank for their support or inspiration.
+- Firebase Account
