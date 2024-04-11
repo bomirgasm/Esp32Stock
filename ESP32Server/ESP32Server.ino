@@ -1,25 +1,29 @@
 #include <WiFi.h>
 #include <WebServer.h>
 
+IPAddress local_IP(192, 168, 207, 129);
+IPAddress gateway(192, 168, 207, 129);
+IPAddress subnet(255, 255, 255, 0);
+
 //MUX 선택을 위한 디지털 핀
-int s0 = 8;
-int s1 = 9;
-int s2 = 10;
-int s3 = 11;
+const int s0 = 8;
+const int s1 = 9;
+const int s2 = 10;
+const int s3 = 11;
 
 //Mux 입력 아날로그 핀
-int SIG_pin = 0;
+const int SIG_pin = 0;
+
+int sensorVal[16]={0};
 
 // SSID & Password
-const char *ssid = "KT_GiGA_B6A1";
-const char *password = "a1fj29ji78";
+const char *ssid = "TastyWifi";
+const char *password = "mars1234";
 
 WebServer server(80);  // Object of WebServer(HTTP port, 80 is defult)
 void handle_root();
 
-// HTML 페이지
-#if 1
-const char index_html[] PROGMEM = R"rawliteral(
+const char table_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -95,7 +99,94 @@ const char index_html[] PROGMEM = R"rawliteral(
 </body>
 </html>
 )rawliteral";
-#endif
+
+const char index_html[] PROGMEM = R"rawliteral(
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Login Form</title>
+<style>
+    /* Add some basic styling */
+    body {
+        font-family: Arial, sans-serif;
+    }
+    .container {
+        max-width: 400px;
+        margin: 0 auto;
+        padding: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+        background-color: #f9f9f9;
+    }
+    input[type="text"],
+    input[type="password"],
+    input[type="submit"] {
+        width: 100%;
+        padding: 10px;
+        margin: 5px 0;
+        display: inline-block;
+        border: 1px solid #ccc;
+        border-radius: 4px;
+        box-sizing: border-box;
+    }
+    input[type="submit"] {
+        background-color: #4CAF50;
+        color: white;
+        cursor: pointer;
+    }
+    input[type="submit"]:hover {
+        background-color: #45a049;
+    }
+</style>
+</head>
+<body>
+<div class="container">
+    <h2>Login</h2>
+    <form id="loginForm">
+        <label for="email">Email:</label>
+        <input type="text" id="email" name="email" required>
+        <label for="password">Password:</label>
+        <input type="password" id="password" name="password" required>
+        <input type="submit" value="Login">
+    </form>
+</div>
+
+<script>
+    document.getElementById("loginForm").addEventListener("submit", function(event) {
+        event.preventDefault(); // Prevent the form from submitting normally
+
+        // Get the values from the form
+        var email = document.getElementById("email").value;
+        var password = document.getElementById("password").value;
+
+        var formData = new FormData();
+        formData.append("email", email);
+        formData.append("password", password);
+
+        fetch('http://192.168.207.129/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(formData).toString()
+        })
+        .then(data => {
+            // Handle the response from the server
+            // Reload the page with the received HTML content
+            document.open();
+            document.write(data);
+            document.close();
+        })
+        
+    });
+</script>
+
+</body>
+</html>
+)rawliteral";
+
 
 
 //페이지 요청이 들어 오면 처리 하는 함수
@@ -104,13 +195,22 @@ void handle_root()
   server.send(200, "text/html", index_html);
 }
 
+void handle_login()
+{
+  if (server.hasArg("email")) {
+    String email = server.arg("email");
+    String password = server.arg("password");
+  }
+  server.send(200, "text/html", table_html);
+}
+
 
 void InitWebServer() 
 {
 	//페이지 요청 처리 함수 등록
 	server.on("/", handle_root);
-
-    server.begin();
+  server.on("/login", handle_login);
+  server.begin();
 }
 
 void setup() {
@@ -118,7 +218,7 @@ void setup() {
 	Serial.println("ESP32 Simple web Start");
 	Serial.println(ssid);
 
-  
+  /*
   pinMode(s0, OUTPUT);
   pinMode(s1, OUTPUT);
   pinMode(s2, OUTPUT);
@@ -127,8 +227,11 @@ void setup() {
   digitalWrite(s0, LOW);
   digitalWrite(s1, LOW);
   digitalWrite(s2, LOW);
-  digitalWrite(s3, LOW);
-
+  digitalWrite(s3, LOW); 
+  */
+  if (!WiFi.config(local_IP, gateway, subnet)) {
+    Serial.println("STA Failed to configure");
+  }
 	//WiFi 접속
 	WiFi.begin(ssid, password);
 
@@ -147,14 +250,13 @@ void setup() {
 }
 
 void loop() {
+
   server.handleClient();
 
-  for(int i = 0; i < 16; i ++){ 
-  Serial.print("Value at channel "); 
-  Serial.print(i); Serial.print(": "); 
-  Serial.println(readMux(i)); 
-  delay(1000); 
-  } 
+  /*for(int i = 0; i < 16; i ++){ 
+    sensorVal[i] = readMux(i);
+    delay(10); 
+  } */
 }
 
 int readMux(int channel)  { 
@@ -180,6 +282,7 @@ int readMux(int channel)  {
   for(int i = 0; i < 4; i ++){ 
     digitalWrite(controlPin[i], muxChannel[channel][i]); 
   } 
+  
   //read the value at the SIG pin 
   int val = analogRead(SIG_pin);  
   return val; 

@@ -32,13 +32,12 @@
 #endif
 
 #include <FirebaseClient.h>
-
-#define WIFI_SSID "KT_GiGA_B6A1"
-#define WIFI_PASSWORD "a1fj29ji78"
+  
+#define WIFI_SSID "TastyWifi"
+#define WIFI_PASSWORD "mars1234"
 
 // The API key can be obtained from Firebase console > Project Overview > Project settings.
-#define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs
-"
+#define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
 /**
  * This information can be taken from the service account JSON file.
  *
