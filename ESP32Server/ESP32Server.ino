@@ -14,7 +14,7 @@ const int s3 = 11;
 //Mux 입력 아날로그 핀
 const int SIG_pin = 0;
 
-int sensorVal[16]={0};
+bool sensorValues[SENSOR_COUNT];
 
 // SSID & Password
 const char *ssid = "TastyWifi";
@@ -172,13 +172,18 @@ const char index_html[] PROGMEM = R"rawliteral(
             },
             body: new URLSearchParams(formData).toString()
         })
+        .then(response => response.text())
         .then(data => {
             // Handle the response from the server
+            console.log(data);
             // Reload the page with the received HTML content
             document.open();
             document.write(data);
             document.close();
         })
+        .catch(error => {
+            console.error('Error:', error);
+        });
         
     });
 </script>
@@ -253,10 +258,17 @@ void loop() {
 
   server.handleClient();
 
-  /*for(int i = 0; i < 16; i ++){ 
-    sensorVal[i] = readMux(i);
+  /*for(int i = 0; i < 16; i ++){
+    if(readMux(i) > 512) 
+      sensorValues[i] = true;
+    else sensorValues[i] = false;
     delay(10); 
-  } */
+  }
+  String result = "";
+  for (int i = 0; i < 16; ++i) {
+    result += array[i] ? "1" : "0";
+  } 
+  */
 }
 
 int readMux(int channel)  { 
