@@ -26,17 +26,7 @@
  */
 
 #include <Arduino.h>
-#if defined(ESP32) || defined(ARDUINO_RASPBERRY_PI_PICO_W)
 #include <WiFi.h>
-#elif defined(ESP8266)
-#include <ESP8266WiFi.h>
-#elif __has_include(<WiFiNINA.h>)
-#include <WiFiNINA.h>
-#elif __has_include(<WiFi101.h>)
-#include <WiFi101.h>
-#elif __has_include(<WiFiS3.h>)
-#include <WiFiS3.h>
-#endif
 
 #include <FirebaseClient.h>
 #define WIFI_SSID "TastyWifi"
@@ -50,6 +40,12 @@
 #define USER_PASSWORD "mars-1234"
 #define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
+
+IPAddress local_IP(192, 168, 207, 129); //  서버 고정 IP 주소
+IPAddress gateway(192, 168, 207, 129);
+IPAddress subnet(255, 255, 255, 0);
+
+
 void printError(int code, const String &msg);
 
 void asyncCB(AsyncResult &aResult);
@@ -60,13 +56,8 @@ UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD);
 
 FirebaseApp app;
 
-#if defined(ESP32) || defined(ESP8266) || defined(PICO_RP2040)
 #include <WiFiClientSecure.h>
 WiFiClientSecure ssl_client;
-#elif defined(ARDUINO_ARCH_SAMD)
-#include <WiFiSSLClient.h>
-WiFiSSLClient ssl_client;
-#endif
 
 // In case the keyword AsyncClient using in this example was ambigous and used by other library, you can change
 // it with other name with keyword "using" or use the class name AsyncClientClass directly.
@@ -80,12 +71,17 @@ RealtimeDatabase Database;
 void setup()
 {
 
-    Serial.begin(115200);
-    WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+  Serial.begin(115200);
+    
+  /*if (!WiFi.config(local_IP, gateway, subnet)) {
+    Serial.println("STA Failed to configure");
+  }*/
+	//WiFi 접속
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
-    Serial.print("Connecting to Wi-Fi");
-    unsigned long ms = millis();
-    while (WiFi.status() != WL_CONNECTED)
+  Serial.print("Connecting to Wi-Fi");
+  unsigned long ms = millis();
+  while (WiFi.status() != WL_CONNECTED)
     {
         Serial.print(".");
         delay(300);

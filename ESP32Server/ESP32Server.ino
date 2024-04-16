@@ -1,9 +1,39 @@
+
+#include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
 
-IPAddress local_IP(192, 168, 207, 129);
+IPAddress local_IP(192, 168, 207, 129); //  서버 고정 IP 주소
 IPAddress gateway(192, 168, 207, 129);
 IPAddress subnet(255, 255, 255, 0);
+
+#include <FirebaseClient.h>
+
+#define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
+
+#define USER_EMAIL "simon5678@naver.com"
+#define USER_PASSWORD "mars-1234"
+#define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
+
+void printError(int code, const String &msg);
+
+void asyncCB(AsyncResult &aResult);
+
+void checkSensorString(String sensorString);
+int readMux(int channel);
+
+DefaultNetwork network; // initilize with boolean parameter to enable/disable network reconnection
+
+FirebaseApp app;
+
+#include <WiFiClientSecure.h>
+WiFiClientSecure ssl_client;
+
+using AsyncClient = AsyncClientClass;
+
+AsyncClient aClient(ssl_client, getNetwork(network));
+
+RealtimeDatabase Database;
 
 //MUX 선택을 위한 디지털 핀
 const int s0 = 8;
@@ -14,10 +44,9 @@ const int s3 = 11;
 //Mux 입력 아날로그 핀
 const int SIG_pin = 0;
 
-bool sensorValues[SENSOR_COUNT];
+bool sensorValues[16];
 
-// SSID & Password
-const char *ssid = "TastyWifi";
+const char *ssid = "TastyWifi"; // 와이파이 SSID & Password
 const char *password = "mars1234";
 
 WebServer server(80);  // Object of WebServer(HTTP port, 80 is defult)
@@ -209,13 +238,28 @@ void handle_login()
   server.send(200, "text/html", table_html);
 }
 
-
 void InitWebServer() 
 {
 	//페이지 요청 처리 함수 등록
 	server.on("/", handle_root);
   server.on("/login", handle_login);
   server.begin();
+}
+
+UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD);
+
+void InitFirebase() {
+  ssl_client.setInsecure();
+  app.setCallback(asyncCB);
+  initializeApp(aClient, app, getAuth(user_auth));
+
+  // Waits for app to be authenticated.
+  // For asynchronous operation, this blocking wait can be ignored by calling app.loop() in loop().
+  unsigned long ms = millis();
+  while (app.isInitialized() && !app.ready() && millis() - ms < 120 * 1000)
+        ;
+  app.getApp<RealtimeDatabase>(Database);
+  Database.url(DATABASE_URL);
 }
 
 void setup() {
@@ -252,11 +296,24 @@ void setup() {
 	InitWebServer(); 
 	Serial.println("HTTP server started");
 	delay(100); 
+
+  InitFirebase();
+
+  Serial.print("Get string... ");
+    String v3 = Database.get<String>(aClient, "/test/string");
+    if (aClient.lastError().code() == 0) {
+      
+        Serial.println(v3);
+        checkSensorString(v3);
+    }
+    else
+        printError(aClient.lastError().code(), aClient.lastError().message());
 }
 
 void loop() {
 
   server.handleClient();
+  app.loop();
 
   /*for(int i = 0; i < 16; i ++){
     if(readMux(i) > 512) 
@@ -299,3 +356,34 @@ int readMux(int channel)  {
   int val = analogRead(SIG_pin);  
   return val; 
 } 
+
+void checkSensorString(String sensorString) {
+  for (int i = 0; i < sensorString.length(); ++i) {
+    char currentChar = sensorString.charAt(i);
+    Serial.println(currentChar);
+    // 여기서 각각의 문자열을 처리할 수 있습니다.
+  }
+}
+
+void asyncCB(AsyncResult &aResult)
+{
+    if (aResult.appEvent().code() > 0)
+    {
+        Firebase.printf("Event msg: %s, code: %d\n", aResult.appEvent().message().c_str(), aResult.appEvent().code());
+    }
+
+    if (aResult.isDebug())
+    {
+        Firebase.printf("Debug msg: %s\n", aResult.debug().c_str());
+    }
+
+    if (aResult.isError())
+    {
+        Firebase.printf("Error msg: %s, code: %d\n", aResult.error().message().c_str(), aResult.error().code());
+    }
+}
+
+void printError(int code, const String &msg)
+{
+    Firebase.printf("Error, msg: %s, code: %d\n", msg.c_str(), code);
+}
