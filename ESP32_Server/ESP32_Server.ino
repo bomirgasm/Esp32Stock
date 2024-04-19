@@ -39,9 +39,11 @@ WebServer server(80);  // Object of WebServer(HTTP port, 80 is defult)
 
 const char *dir; 
 
+bool sensorValue[16];
+
 void handle_root();
 
-const char table_html[] PROGMEM = R"rawliteral(
+string table_html1 PROGMEM = R"rawliteral(
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -90,28 +92,9 @@ const char table_html[] PROGMEM = R"rawliteral(
 </table>
 
 <script>
-    // 각 셀에 대해 랜덤한 색상을 지정합니다.
-    function randomColor() {
-        return '#' + Math.floor(Math.random()*16777215).toString(16);
-    }
+)rawliteral";
 
-    // 각 셀에 랜덤한 색상을 적용합니다.
-    document.getElementById('cell11').style.backgroundColor = randomColor();
-    document.getElementById('cell12').style.backgroundColor = randomColor();
-    document.getElementById('cell13').style.backgroundColor = randomColor();
-    document.getElementById('cell14').style.backgroundColor = randomColor();
-    document.getElementById('cell21').style.backgroundColor = randomColor();
-    document.getElementById('cell22').style.backgroundColor = randomColor();
-    document.getElementById('cell23').style.backgroundColor = randomColor();
-    document.getElementById('cell24').style.backgroundColor = randomColor();
-    document.getElementById('cell31').style.backgroundColor = randomColor();
-    document.getElementById('cell32').style.backgroundColor = randomColor();
-    document.getElementById('cell33').style.backgroundColor = randomColor();
-    document.getElementById('cell34').style.backgroundColor = randomColor();
-    document.getElementById('cell41').style.backgroundColor = randomColor();
-    document.getElementById('cell42').style.backgroundColor = randomColor();
-    document.getElementById('cell43').style.backgroundColor = randomColor();
-    document.getElementById('cell44').style.backgroundColor = randomColor();
+string table_html2 PROGMEM = R"rawliteral(
 </script>
 
 </body>
@@ -183,7 +166,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         formData.append("email", email);
         formData.append("password", password);
 
-        fetch('http://192.168.219.103/login', {
+        fetch('http://192.168.74.90/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -236,8 +219,25 @@ void handle_login()
     }
     else
       printError(aClient.lastError().code(), aClient.lastError().message());
+  }
+  //HTML 구성
+  string html;
+
+  for(int i=1;i<5;i++) {
+    for(int j=1;j<5;j++) {
+      html += "document.getElementById('cell";
+      html += String(i).c_str();
+      html += String(j).c_str();
+      html += "').style.backgroundColor =";
+      if(sensorValue[(i-1)*4 + j-1] ) {
+        html += "'white';";
+      }
+      else {
+        html += "'red';\n";
+      }
     }
-  server.send(200, "text/html", table_html);
+  }
+  server.send(200, "text/html", (table_html1+html+table_html2).c_str());
 }
 
 void InitWebServer() 
@@ -301,8 +301,12 @@ void loop() {
 void checkSensorString(String sensorString) {
   for (int i = 0; i < sensorString.length(); ++i) {
     char currentChar = sensorString.charAt(i);
-    Serial.println(currentChar);
-    // 여기서 각각의 문자열을 처리할 수 있습니다.
+    if(currentChar=='0') {
+      sensorValue[i] = false;
+    }
+    else {
+      sensorValue[i] = true;
+    }
   }
 }
 
