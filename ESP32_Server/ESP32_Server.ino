@@ -1,18 +1,20 @@
-
 #include <Arduino.h>
 #include <WiFi.h>
 #include <WebServer.h>
+#include <FirebaseClient.h>
+#include <WiFiClientSecure.h>
+
+const char *ssid = "TastyWifi"; // 와이파이 SSID & Password
+const char *password = "mars1234";
 
 IPAddress local_IP(192, 168, 207, 129); //  서버 고정 IP 주소
-IPAddress gateway(192, 168, 207, 129);
+IPAddress gateway(192, 168, 207, 128);
 IPAddress subnet(255, 255, 255, 0);
-
-#include <FirebaseClient.h>
 
 #define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
 
-#define USER_EMAIL "simon5678@naver.com"
-#define USER_PASSWORD "mars-1234"
+const char * USER_EMAIL = "simon5678@naver.com";
+const char * USER_PASSWORD = "mars-1234";
 #define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 void printError(int code, const String &msg);
@@ -20,13 +22,11 @@ void printError(int code, const String &msg);
 void asyncCB(AsyncResult &aResult);
 
 void checkSensorString(String sensorString);
-int readMux(int channel);
 
 DefaultNetwork network; // initilize with boolean parameter to enable/disable network reconnection
 
 FirebaseApp app;
 
-#include <WiFiClientSecure.h>
 WiFiClientSecure ssl_client;
 
 using AsyncClient = AsyncClientClass;
@@ -35,21 +35,10 @@ AsyncClient aClient(ssl_client, getNetwork(network));
 
 RealtimeDatabase Database;
 
-//MUX 선택을 위한 디지털 핀
-const int s0 = 8;
-const int s1 = 9;
-const int s2 = 10;
-const int s3 = 11;
-
-//Mux 입력 아날로그 핀
-const int SIG_pin = 0;
-
-bool sensorValues[16];
-
-const char *ssid = "TastyWifi"; // 와이파이 SSID & Password
-const char *password = "mars1234";
-
 WebServer server(80);  // Object of WebServer(HTTP port, 80 is defult)
+
+const char *dir; 
+
 void handle_root();
 
 const char table_html[] PROGMEM = R"rawliteral(
@@ -194,7 +183,7 @@ const char index_html[] PROGMEM = R"rawliteral(
         formData.append("email", email);
         formData.append("password", password);
 
-        fetch('http://192.168.207.129/login', {
+        fetch('http://192.168.219.103/login', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -234,7 +223,20 @@ void handle_login()
   if (server.hasArg("email")) {
     String email = server.arg("email");
     String password = server.arg("password");
-  }
+    USER_EMAIL = email.c_str();
+    USER_PASSWORD = password.c_str();
+
+    InitFirebase();
+    Serial.print("Get string... ");
+    String v3 = Database.get<String>(aClient, dir);
+    if (aClient.lastError().code() == 0) {
+      
+      Serial.println(v3);
+      checkSensorString(v3);
+    }
+    else
+      printError(aClient.lastError().code(), aClient.lastError().message());
+    }
   server.send(200, "text/html", table_html);
 }
 
@@ -260,6 +262,7 @@ void InitFirebase() {
         ;
   app.getApp<RealtimeDatabase>(Database);
   Database.url(DATABASE_URL);
+  dir = ("/"+app.getUid()+"/1").c_str();
 }
 
 void setup() {
@@ -268,19 +271,9 @@ void setup() {
 	Serial.println(ssid);
 
   /*
-  pinMode(s0, OUTPUT);
-  pinMode(s1, OUTPUT);
-  pinMode(s2, OUTPUT);
-  pinMode(s3, OUTPUT);
-
-  digitalWrite(s0, LOW);
-  digitalWrite(s1, LOW);
-  digitalWrite(s2, LOW);
-  digitalWrite(s3, LOW); 
-  */
   if (!WiFi.config(local_IP, gateway, subnet)) {
     Serial.println("STA Failed to configure");
-  }
+  }*/
 	//WiFi 접속
 	WiFi.begin(ssid, password);
 
@@ -296,18 +289,6 @@ void setup() {
 	InitWebServer(); 
 	Serial.println("HTTP server started");
 	delay(100); 
-
-  InitFirebase();
-
-  Serial.print("Get string... ");
-    String v3 = Database.get<String>(aClient, "/test/string");
-    if (aClient.lastError().code() == 0) {
-      
-        Serial.println(v3);
-        checkSensorString(v3);
-    }
-    else
-        printError(aClient.lastError().code(), aClient.lastError().message());
 }
 
 void loop() {
@@ -315,47 +296,7 @@ void loop() {
   server.handleClient();
   app.loop();
 
-  /*for(int i = 0; i < 16; i ++){
-    if(readMux(i) > 512) 
-      sensorValues[i] = true;
-    else sensorValues[i] = false;
-    delay(10); 
-  }
-  String result = "";
-  for (int i = 0; i < 16; ++i) {
-    result += array[i] ? "1" : "0";
-  } 
-  */
 }
-
-int readMux(int channel)  { 
-  int controlPin[] = {s0, s1, s2, s3}; 
-  int muxChannel[16][4]={ {0,0,0,0},  
-  {1,0,0,0}, //channel 1 
-  {0,1,0,0}, //channel 2 
-  {1,1,0,0}, //channel 3 
-  {0,0,1,0}, //channel 4 
-  {1,0,1,0}, //channel 5 
-  {0,1,1,0}, //channel 6 
-  {1,1,1,0}, //channel 7 
-  {0,0,0,1}, //channel 8 
-  {1,0,0,1}, //channel 9 
-  {0,1,0,1}, //channel 10 
-  {1,1,0,1}, //channel 11 
-  {0,0,1,1}, //channel 12 
-  {1,0,1,1}, //channel 13 
-  {0,1,1,1}, //channel 14 
-  {1,1,1,1} //channel 15 
-  }; 
-  // 시그널 핀 4개 출력
-  for(int i = 0; i < 4; i ++){ 
-    digitalWrite(controlPin[i], muxChannel[channel][i]); 
-  } 
-  
-  //read the value at the SIG pin 
-  int val = analogRead(SIG_pin);  
-  return val; 
-} 
 
 void checkSensorString(String sensorString) {
   for (int i = 0; i < sensorString.length(); ++i) {

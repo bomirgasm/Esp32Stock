@@ -1,36 +1,37 @@
 //Mux control pins
-int s0 = 8;
-int s1 = 9;
-int s2 = 10;
-int s3 = 11;
-
-//Mux in “SIG” pin
-int SIG_pin = 0;
+const int s0 = 19;
+const int s1 = 18;
+const int s2 = 5;
+const int s3 = 17;
+//Mux 입력 아날로그 핀
+const int SIG_pin = 34;
 
 void setup(){
 pinMode(s0, OUTPUT);
 pinMode(s1, OUTPUT);
 pinMode(s2, OUTPUT);
 pinMode(s3, OUTPUT);
+pinMode(SIG_pin, INPUT);
 
 digitalWrite(s0, LOW);
 digitalWrite(s1, LOW);
 digitalWrite(s2, LOW);
 digitalWrite(s3, LOW);
 
-Serial.begin(9600);
+Serial.begin(115200);
 }
 
 void loop(){
 
 //Loop through and read all 16 values
 //Reports back Value at channel 6 is: 346
-for(int i = 0; i < 16; i ++){ 
-  Serial.print("Value at channel "); 
-  Serial.print(i); Serial.print(": "); 
-  Serial.println(readMux(i)); 
-  delay(1000); 
+for(int i = 0; i < 1; i ++){ 
+    Serial.print("Value at channel "); 
+    Serial.print(i); Serial.print(": "); 
+    Serial.println(readMux(i)); 
+    delay(100); 
   } 
+  delay(1000); 
 }
   
 int readMux(int channel)  { 
@@ -56,7 +57,8 @@ int readMux(int channel)  {
   for(int i = 0; i < 4; i ++){ 
     digitalWrite(controlPin[i], muxChannel[channel][i]); 
   } 
+  delay(10);
   //read the value at the SIG pin 
-  int val = analogRead(SIG_pin); //return the value 
+  int val = digitalRead(SIG_pin); //return the value 
   return val; 
 } 
