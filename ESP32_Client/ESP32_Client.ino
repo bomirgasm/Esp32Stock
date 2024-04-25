@@ -10,7 +10,7 @@ const char *password = "mars-1234";
 
 #define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
 
-#define USER_EMAIL "simon5678@naver.com" //DB아래의 아이디/비밀번호 설정
+#define USER_EMAIL "marsimon5678@gmail.com" //DB아래의 아이디/비밀번호 설정
 #define USER_PASSWORD "mars-1234"
 #define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
@@ -45,6 +45,7 @@ const int s3 = 17;
 //Mux 입력 아날로그 핀
 const int SIG_pin = 34;
 
+bool prevSensorValues[16]={false};
 bool sensorValues[16]={false};
 
 const char *dir; 
@@ -77,6 +78,7 @@ void setup() {
   pinMode(s1, OUTPUT);
   pinMode(s2, OUTPUT);
   pinMode(s3, OUTPUT);
+  pinMode(SIG_pin, INPUT);
 
   digitalWrite(s0, LOW);
   digitalWrite(s1, LOW);
@@ -113,14 +115,28 @@ void loop() {
 }
 
 void setDataBase() {
-  /*
+  
   for(int i = 0; i < 16; i ++){
-    if(readMux(i) > 512) 
+    if(readMux(i) == LOW) 
       sensorValues[i] = true;
     else sensorValues[i] = false;
     delay(10); 
-  }*/
-
+    
+    Serial.println(prevSensorValues[i]);
+  }
+  
+  for(int i = 0; i < 16; i ++){
+    if(sensorValues[i]==prevSensorValues[i]) {
+      if(i==15) {
+        return;
+      }
+    } 
+    else  {
+      break;
+    }
+  }
+  for(int i = 0; i < 16; i ++)
+    prevSensorValues[i]=sensorValues[i];
   string result = "";
   for (int i = 0; i < 16; ++i) {
     result += sensorValues[i] ? "1" : "0";
@@ -129,13 +145,21 @@ void setDataBase() {
   sendData = result.c_str();
   Serial.println(sendData);
 
+  SendDataBaseSet();
+  
+}
+
+void SendDataBaseSet() {
   InitFirebase();
 
   bool status = Database.set<String>(aClient, dir,sendData);
     if (status)
         Serial.println("Set string is ok");
-    else
+    else {
         printError(aClient.lastError().code(), aClient.lastError().message());
+        delay(3000);
+        SendDataBaseSet();
+    }
 }
 
 int readMux(int channel)  { 
@@ -163,7 +187,7 @@ int readMux(int channel)  {
   } 
   
   //read the value at the SIG pin 
-  int val = analogRead(SIG_pin);  
+  int val = digitalRead(SIG_pin);  
   return val; 
 } 
 

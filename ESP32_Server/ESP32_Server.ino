@@ -37,7 +37,8 @@ RealtimeDatabase Database;
 
 WebServer server(80);  // Object of WebServer(HTTP port, 80 is defult)
 
-const char *dir; 
+string dir; 
+const char *sendData;
 
 bool sensorValue[16];
 
@@ -52,13 +53,15 @@ string table_html1 PROGMEM = R"rawliteral(
 <title>4x4 테이블</title>
 <style>
     table {
-        border-collapse: collapse;
         width: 50%;
+        border-collapse: collapse;
+        margin: 50px auto;
+        font-family: 'Arial', sans-serif;
     }
-    td {
-        border: 1px solid black;
-        padding: 10px;
+    th, td {
+        padding: 40px;
         text-align: center;
+        border: 4px solid #ccc;
     }
 </style>
 </head>
@@ -90,8 +93,42 @@ string table_html1 PROGMEM = R"rawliteral(
         <td id="cell44"></td>
     </tr>
 </table>
+<h3 id="exp">EXP : </h3>
+<form id="dateForm">
+    <input type="date" id="dateInput" name="date">
+    <input type="submit" value="유통기한 설정">
+</form>
 
 <script>
+document.getElementById("dateForm").addEventListener("submit", function(event) {
+        event.preventDefault(); // Prevent the form from submitting normally
+
+        var date = document.getElementById("dateInput").value;
+
+        var formData = new FormData();
+        formData.append("date", date);
+
+        fetch('http://192.168.74.90/login/date', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(formData).toString()
+        })
+        .then(response => response.text())
+        .then(data => {
+            // Handle the response from the server
+            console.log(data);
+            // Reload the page with the received HTML content
+            document.open();
+            document.write(data);
+            document.close();
+        })
+        .catch(error => {
+            console.error('Error:', error);
+        });
+        
+    });
 )rawliteral";
 
 string table_html2 PROGMEM = R"rawliteral(
@@ -203,15 +240,14 @@ void handle_root()
 
 void handle_login()
 {
+  string html;
   if (server.hasArg("email")) {
-    String email = server.arg("email");
-    String password = server.arg("password");
-    USER_EMAIL = email.c_str();
-    USER_PASSWORD = password.c_str();
+    USER_EMAIL = server.arg("email").c_str();
+    USER_PASSWORD = server.arg("password").c_str();
 
     InitFirebase();
     Serial.print("Get string... ");
-    String v3 = Database.get<String>(aClient, dir);
+    String v3 = Database.get<String>(aClient, (dir+"/1").c_str());
     if (aClient.lastError().code() == 0) {
       
       Serial.println(v3);
@@ -219,10 +255,21 @@ void handle_login()
     }
     else
       printError(aClient.lastError().code(), aClient.lastError().message());
+    
+    v3 = Database.get<String>(aClient, (dir+"/2").c_str());
+    if (aClient.lastError().code() == 0&&v3!=null) {
+      Serial.println(v3);
+      html += "document.getElementById('exp').textContent = 'Expiration date : ";
+      html += v3.c_str();
+      html += "';";
+
+    }
+    else {
+      html += "document.getElementById('exp').textContent = 'Expiration date : N/A";
+      printError(aClient.lastError().code(), aClient.lastError().message());
+    }
   }
   //HTML 구성
-  string html;
-
   for(int i=1;i<5;i++) {
     for(int j=1;j<5;j++) {
       html += "document.getElementById('cell";
@@ -240,11 +287,26 @@ void handle_login()
   server.send(200, "text/html", (table_html1+html+table_html2).c_str());
 }
 
+void handle_date()
+{
+  if (server.hasArg("date")) {
+    Serial.println(server.arg("date").c_str());
+    InitFirebase();
+    
+    bool status = Database.set<String>(aClient, (dir+"/2").c_str(),server.arg("date").c_str());
+    if (status)
+        Serial.println("Set string is ok");
+    else
+        printError(aClient.lastError().code(), aClient.lastError().message());
+  }
+}
+
 void InitWebServer() 
 {
 	//페이지 요청 처리 함수 등록
 	server.on("/", handle_root);
   server.on("/login", handle_login);
+  server.on("/login/date", handle_date);
   server.begin();
 }
 
@@ -262,7 +324,7 @@ void InitFirebase() {
         ;
   app.getApp<RealtimeDatabase>(Database);
   Database.url(DATABASE_URL);
-  dir = ("/"+app.getUid()+"/1").c_str();
+  dir = ("/"+app.getUid()).c_str();
 }
 
 void setup() {
