@@ -13,8 +13,8 @@ IPAddress subnet(255, 255, 255, 0);
 
 #define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
 
-const char * USER_EMAIL = "simon5678@naver.com";
-const char * USER_PASSWORD = "mars-1234";
+const char * USER_EMAIL = "k.suzie.97@gmail.com";
+const char * USER_PASSWORD = "111111";
 #define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 void printError(int code, const String &msg);
@@ -55,13 +55,17 @@ string table_html1 PROGMEM = R"rawliteral(
     table {
         width: 50%;
         border-collapse: collapse;
-        margin: 50px auto;
+        margin: 20px auto;
         font-family: 'Arial', sans-serif;
     }
     th, td {
         padding: 40px;
         text-align: center;
         border: 4px solid #ccc;
+    }
+    #tT, #tT th, #tT td {
+    	padding: 5px;
+      border: 1px solid transparent; 
     }
 </style>
 </head>
@@ -91,6 +95,14 @@ string table_html1 PROGMEM = R"rawliteral(
         <td id="cell42"></td>
         <td id="cell43"></td>
         <td id="cell44"></td>
+    </tr>
+</table>
+<table id="tT">
+    <tr>
+        <td id="c1"></td>
+        <td id="c2"></td>
+        <td id="c3"></td>
+        <td id="c4"></td>
     </tr>
 </table>
 <h3 id="exp">EXP : </h3>
@@ -256,8 +268,27 @@ void handle_login()
     else
       printError(aClient.lastError().code(), aClient.lastError().message());
     
+    int arr[4]={0};
+    for(int i=0;i<16;i++) {
+      if(sensorValue[i]) {
+        arr[i%4]++;
+      }
+    }
+    html += "document.getElementById('c1').textContent = 'Stock A : ";
+    html +=  String(arr[0]).c_str();
+    html += "';";
+    html += "document.getElementById('c2').textContent = 'Stock B : ";
+    html +=  String(arr[1]).c_str();
+    html += "';";
+    html += "document.getElementById('c3').textContent = 'Stock C : ";
+    html +=  String(arr[2]).c_str();
+    html += "';";
+    html += "document.getElementById('c4').textContent = 'Stock D : ";
+    html +=  String(arr[3]).c_str();
+    html += "';";
+
     v3 = Database.get<String>(aClient, (dir+"/2").c_str());
-    if (aClient.lastError().code() == 0&&v3!=null) {
+    if (aClient.lastError().code() == 0) {
       Serial.println(v3);
       html += "document.getElementById('exp').textContent = 'Expiration date : ";
       html += v3.c_str();

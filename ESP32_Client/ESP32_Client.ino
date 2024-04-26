@@ -3,15 +3,15 @@
 #include <FirebaseClient.h>
 #include <WiFiClientSecure.h>
 
-const char *ssid = "MarsHome"; // 와이파이 SSID & Password 설정
-const char *password = "mars-1234";
+const char *ssid = "Suzie"; // 와이파이 SSID & Password 설정
+const char *password = "79994448";
 
 #define DEVICE_NO "1" //기기번호 설정
 
 #define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
 
-#define USER_EMAIL "marsimon5678@gmail.com" //DB아래의 아이디/비밀번호 설정
-#define USER_PASSWORD "mars-1234"
+#define USER_EMAIL "k.suzie.97@gmail.com" //DB아래의 아이디/비밀번호 설정
+#define USER_PASSWORD "111111"
 #define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 
