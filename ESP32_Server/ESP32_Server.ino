@@ -1,48 +1,51 @@
-#include <Arduino.h>
 #include <WiFi.h>
-#include <WebServer.h>
+#include <AsyncTCP.h>
+#include <ESPAsyncWebServer.h>
 #include <FirebaseClient.h>
 #include <WiFiClientSecure.h>
 
-const char *ssid = "TastyWifi"; // 와이파이 SSID & Password
-const char *password = "mars1234";
 
-IPAddress local_IP(192, 168, 207, 129); //  서버 고정 IP 주소
-IPAddress gateway(192, 168, 207, 128);
-IPAddress subnet(255, 255, 255, 0);
+const unsigned long EVENT_INTERVAL_MS = 5000; //페이지 업데이트 주기
 
-#define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
+const char *ssid = "Suzie"; // 와이파이 SSID & Password
+const char *password = "79994448";
 
+
+const char * API_KEY = "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs";
 const char * USER_EMAIL = "k.suzie.97@gmail.com";
 const char * USER_PASSWORD = "111111";
 #define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
-void printError(int code, const String &msg);
 
-void asyncCB(AsyncResult &aResult);
-
+//UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD);
+UserAuth* user_auth = nullptr;
+//
 void checkSensorString(String sensorString);
+void processResult(AsyncResult &aResult);
+void InitFirebase();
 
-DefaultNetwork network; // initilize with boolean parameter to enable/disable network reconnection
+DefaultNetwork network; 
 
 FirebaseApp app;
 
 WiFiClientSecure ssl_client;
 
-using AsyncClient = AsyncClientClass;
+AsyncResult aResult_no_callback;
 
-AsyncClient aClient(ssl_client, getNetwork(network));
+AsyncClientClass aClient(ssl_client, getNetwork(network));
 
 RealtimeDatabase Database;
 
-WebServer server(80);  // Object of WebServer(HTTP port, 80 is defult)
+AsyncWebServer server(80);
+AsyncEventSource events("/events");
 
 string dir; 
 const char *sendData;
 
-bool sensorValue[16];
+String sensorData;
+String expData;
 
-void handle_root();
+uint32_t prev_ms;
 
 string table_html1 PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -50,7 +53,7 @@ string table_html1 PROGMEM = R"rawliteral(
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>4x4 테이블</title>
+<title>Current Stock</title>
 <style>
     table {
         width: 50%;
@@ -63,55 +66,80 @@ string table_html1 PROGMEM = R"rawliteral(
         text-align: center;
         border: 4px solid #ccc;
     }
-    #tT, #tT th, #tT td {
-    	padding: 5px;
-      border: 1px solid transparent; 
+    .center {
+    text-align: center;
+    margin-top: 20px;
+    }
+    .center p {
+    display: inline;
+    margin: 0 10px;
     }
 </style>
 </head>
 <body>
 
-<table>
-    <tr>
-        <td id="cell11"></td>
-        <td id="cell12"></td>
-        <td id="cell13"></td>
-        <td id="cell14"></td>
-    </tr>
-    <tr>
-        <td id="cell21"></td>
-        <td id="cell22"></td>
-        <td id="cell23"></td>
-        <td id="cell24"></td>
-    </tr>
-    <tr>
-        <td id="cell31"></td>
-        <td id="cell32"></td>
-        <td id="cell33"></td>
-        <td id="cell34"></td>
-    </tr>
-    <tr>
-        <td id="cell41"></td>
-        <td id="cell42"></td>
-        <td id="cell43"></td>
-        <td id="cell44"></td>
-    </tr>
+<table id="binaryTable">
+  <tr>
+    <td></td><td></td><td></td><td></td>
+  </tr>
+  <tr>
+    <td></td><td></td><td></td><td></td>
+  </tr>
+  <tr>
+    <td></td><td></td><td></td><td></td>
+  </tr>
+  <tr>
+    <td></td><td></td><td></td><td></td>
+  </tr>
 </table>
-<table id="tT">
-    <tr>
-        <td id="c1"></td>
-        <td id="c2"></td>
-        <td id="c3"></td>
-        <td id="c4"></td>
-    </tr>
-</table>
-<h3 id="exp">EXP : </h3>
+<div id="columnCounts" class="center"></div>
+<h3 id="exp"></h3>
 <form id="dateForm">
     <input type="date" id="dateInput" name="date">
     <input type="submit" value="유통기한 설정">
 </form>
 
 <script>
+function updateTable(binaryString) {
+    const cells = document.querySelectorAll('#binaryTable td');
+    if (binaryString.length !== 16) {
+      return;
+    }
+
+    cells.forEach((cell, index) => {
+      cell.style.backgroundColor = binaryString[index] === '1' ? 'red' : 'white';
+    });
+    const columnCounts = [0, 0, 0, 0];
+
+    for (let i = 0; i < binaryString.length; i++) {
+      const columnIndex = i % 4;
+      if (binaryString[i] === '1') {
+        columnCounts[columnIndex]++;
+      }
+    }
+    const columnCountsElement = document.getElementById('columnCounts');
+    columnCountsElement.innerHTML = '';
+    columnCounts.forEach((count, index) => {
+      const paragraph = document.createElement('p');
+      paragraph.textContent = `C${index + 1}: ${count}`;
+      columnCountsElement.appendChild(paragraph);
+    });
+}
+
+if (!!window.EventSource) {
+        var source = new EventSource('/events');
+        source.addEventListener('open', function(e) {
+         console.log("Events Connected");
+        }, false);
+
+        source.addEventListener('update', function(e) {
+            updateTable(e.data);
+          }, false);
+          
+        source.addEventListener('exp', function(e) {
+            document.getElementById("exp").innerHTML = '유통기한 : ' + e.data;
+           }, false);
+}
 document.getElementById("dateForm").addEventListener("submit", function(event) {
         event.preventDefault(); // Prevent the form from submitting normally
 
@@ -119,8 +147,9 @@ document.getElementById("dateForm").addEventListener("submit", function(event) {
 
         var formData = new FormData();
         formData.append("date", date);
-
-        fetch('http://192.168.74.90/login/date', {
+        
+        var url = window.location.protocol + "//" + window.location.host + "/date";
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -141,14 +170,12 @@ document.getElementById("dateForm").addEventListener("submit", function(event) {
         });
         
     });
-)rawliteral";
-
-string table_html2 PROGMEM = R"rawliteral(
-</script>
+    </script>
 
 </body>
 </html>
 )rawliteral";
+
 
 const char index_html[] PROGMEM = R"rawliteral(
 <!DOCTYPE html>
@@ -158,7 +185,6 @@ const char index_html[] PROGMEM = R"rawliteral(
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Login Form</title>
 <style>
-    /* Add some basic styling */
     body {
         font-family: Arial, sans-serif;
     }
@@ -215,7 +241,9 @@ const char index_html[] PROGMEM = R"rawliteral(
         formData.append("email", email);
         formData.append("password", password);
 
-        fetch('http://192.168.74.90/login', {
+        var url = window.location.protocol + "//" + window.location.host + "/login"
+
+        fetch(url, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/x-www-form-urlencoded',
@@ -242,127 +270,62 @@ const char index_html[] PROGMEM = R"rawliteral(
 </html>
 )rawliteral";
 
-
-
-//페이지 요청이 들어 오면 처리 하는 함수
-void handle_root()
-{
-  server.send(200, "text/html", index_html);
+void handle_root(AsyncWebServerRequest *request) {
+  request->send_P(200, "text/html", index_html);
 }
 
-void handle_login()
+void handle_login(AsyncWebServerRequest *request)
 {
   string html;
-  if (server.hasArg("email")) {
-    USER_EMAIL = server.arg("email").c_str();
-    USER_PASSWORD = server.arg("password").c_str();
+  Serial.println("Login request arrived");
+  if(request->hasParam("email", true)) {
+    AsyncWebParameter* p = request->getParam("email", true);
+    USER_EMAIL = p->value().c_str();
+    p = request->getParam("password", true);
+    USER_PASSWORD = p->value().c_str();
 
     InitFirebase();
-    Serial.print("Get string... ");
-    String v3 = Database.get<String>(aClient, (dir+"/1").c_str());
-    if (aClient.lastError().code() == 0) {
-      
-      Serial.println(v3);
-      checkSensorString(v3);
-    }
-    else
-      printError(aClient.lastError().code(), aClient.lastError().message());
-    
-    int arr[4]={0};
-    for(int i=0;i<16;i++) {
-      if(sensorValue[i]) {
-        arr[i%4]++;
-      }
-    }
-    html += "document.getElementById('c1').textContent = 'Stock A : ";
-    html +=  String(arr[0]).c_str();
-    html += "';";
-    html += "document.getElementById('c2').textContent = 'Stock B : ";
-    html +=  String(arr[1]).c_str();
-    html += "';";
-    html += "document.getElementById('c3').textContent = 'Stock C : ";
-    html +=  String(arr[2]).c_str();
-    html += "';";
-    html += "document.getElementById('c4').textContent = 'Stock D : ";
-    html +=  String(arr[3]).c_str();
-    html += "';";
-
-    v3 = Database.get<String>(aClient, (dir+"/2").c_str());
-    if (aClient.lastError().code() == 0) {
-      Serial.println(v3);
-      html += "document.getElementById('exp').textContent = 'Expiration date : ";
-      html += v3.c_str();
-      html += "';";
-
-    }
-    else {
-      html += "document.getElementById('exp').textContent = 'Expiration date : N/A";
-      printError(aClient.lastError().code(), aClient.lastError().message());
-    }
   }
-  //HTML 구성
-  for(int i=1;i<5;i++) {
-    for(int j=1;j<5;j++) {
-      html += "document.getElementById('cell";
-      html += String(i).c_str();
-      html += String(j).c_str();
-      html += "').style.backgroundColor =";
-      if(sensorValue[(i-1)*4 + j-1] ) {
-        html += "'white';";
-      }
-      else {
-        html += "'red';\n";
-      }
-    }
-  }
-  server.send(200, "text/html", (table_html1+html+table_html2).c_str());
+  request->send_P(200, "text/html", (table_html1).c_str() );
 }
 
-void handle_date()
+void handle_date(AsyncWebServerRequest *request)
 {
-  if (server.hasArg("date")) {
-    Serial.println(server.arg("date").c_str());
-    InitFirebase();
+  if(request->hasParam("date", true)) {
+    AsyncWebParameter* p = request->getParam("date", true);
+    Serial.println(p->value().c_str());
     
-    bool status = Database.set<String>(aClient, (dir+"/2").c_str(),server.arg("date").c_str());
-    if (status)
-        Serial.println("Set string is ok");
-    else
-        printError(aClient.lastError().code(), aClient.lastError().message());
+    Database.set<String>(aClient, (dir+"/2").c_str(),p->value().c_str(),aResult_no_callback);
   }
 }
 
 void InitWebServer() 
 {
-	//페이지 요청 처리 함수 등록
-	server.on("/", handle_root);
+  server.addHandler(&events);
+  server.on("/", handle_root);
   server.on("/login", handle_login);
-  server.on("/login/date", handle_date);
+  server.on("/date", handle_date);
   server.begin();
 }
 
-UserAuth user_auth(API_KEY, USER_EMAIL, USER_PASSWORD);
+
 
 void InitFirebase() {
+  Serial.println(USER_EMAIL);
+  user_auth = new UserAuth(API_KEY, USER_EMAIL, USER_PASSWORD);
   ssl_client.setInsecure();
-  app.setCallback(asyncCB);
-  initializeApp(aClient, app, getAuth(user_auth));
+  initializeApp(aClient, app, getAuth(*user_auth),  aResult_no_callback);
 
-  // Waits for app to be authenticated.
-  // For asynchronous operation, this blocking wait can be ignored by calling app.loop() in loop().
-  unsigned long ms = millis();
-  while (app.isInitialized() && !app.ready() && millis() - ms < 120 * 1000)
-        ;
   app.getApp<RealtimeDatabase>(Database);
   Database.url(DATABASE_URL);
-  dir = ("/"+app.getUid()).c_str();
 }
 
 void setup() {
 	Serial.begin(115200);
 	Serial.println("ESP32 Simple web Start");
 	Serial.println(ssid);
-
+  
+  prev_ms = millis();
   /*
   if (!WiFi.config(local_IP, gateway, subnet)) {
     Serial.println("STA Failed to configure");
@@ -384,44 +347,57 @@ void setup() {
 	delay(100); 
 }
 
-void loop() {
-
-  server.handleClient();
-  app.loop();
-
-}
-
-void checkSensorString(String sensorString) {
-  for (int i = 0; i < sensorString.length(); ++i) {
-    char currentChar = sensorString.charAt(i);
-    if(currentChar=='0') {
-      sensorValue[i] = false;
-    }
-    else {
-      sensorValue[i] = true;
-    }
-  }
-}
-
-void asyncCB(AsyncResult &aResult)
+void ProcessUpdate()
 {
-    if (aResult.appEvent().code() > 0)
+  if (millis() > prev_ms + EVENT_INTERVAL_MS&&app.ready())
+  {
+    
+    dir = ("/"+app.getUid()).c_str();
+    Database.get(aClient, (dir+"/1").c_str(), aResult_no_callback);
+    Database.get(aClient, (dir+"/2").c_str(), aResult_no_callback);            
+    prev_ms = millis();
+  }
+  
+}
+
+void loop() {
+  ProcessUpdate();
+  app.loop();
+  Database.loop();
+  processResult(aResult_no_callback);
+}
+
+
+void processResult(AsyncResult &aResult)
+{
+    if (aResult.isEvent())
     {
-        Firebase.printf("Event msg: %s, code: %d\n", aResult.appEvent().message().c_str(), aResult.appEvent().code());
+        Firebase.printf("Event task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.appEvent().message().c_str(), aResult.appEvent().code());
     }
 
     if (aResult.isDebug())
     {
-        Firebase.printf("Debug msg: %s\n", aResult.debug().c_str());
+        Firebase.printf("Debug task: %s, msg: %s\n", aResult.uid().c_str(), aResult.debug().c_str());
     }
 
     if (aResult.isError())
     {
-        Firebase.printf("Error msg: %s, code: %d\n", aResult.error().message().c_str(), aResult.error().code());
+        Firebase.printf("Error task: %s, msg: %s, code: %d\n", aResult.uid().c_str(), aResult.error().message().c_str(), aResult.error().code());
     }
-}
 
-void printError(int code, const String &msg)
-{
-    Firebase.printf("Error, msg: %s, code: %d\n", msg.c_str(), code);
+    if (aResult.available())
+    {
+      String data = String(aResult.c_str());
+      data = data.substring(1,data.length()-1);
+      if(data.length()>15) {
+        sensorData = data;
+        events.send(sensorData.c_str(),"update", millis());
+      }
+      else {
+        expData = data;
+        events.send(expData.c_str(),"exp", millis());
+      }
+      Serial.println(data);
+      //Firebase.printf("payload: %s\n", aResult.c_str());
+    }
 }

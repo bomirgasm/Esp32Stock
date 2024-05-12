@@ -11,7 +11,7 @@ const char *password = "79994448";
 #define API_KEY "AIzaSyA3N0pctFrutd3FsAOuqosPrSoMkVCQlhs"
 
 #define USER_EMAIL "k.suzie.97@gmail.com" //DB아래의 아이디/비밀번호 설정
-#define USER_PASSWORD "111111"
+#define USER_PASSWORD "111111"    
 #define DATABASE_URL "https://stockcontrol-1599f-default-rtdb.asia-southeast1.firebasedatabase.app/"
 
 
@@ -122,7 +122,6 @@ void setDataBase() {
     else sensorValues[i] = false;
     delay(10); 
     
-    Serial.println(prevSensorValues[i]);
   }
   
   for(int i = 0; i < 16; i ++){
